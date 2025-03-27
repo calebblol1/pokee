@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokemon Game (Offline Simulation)</title>
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css"> <!-- Ensure this path is correct -->
+  <style>
+    /* Styles for team selection grid */
+    #pokemon-selection {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .pokemon-card {
+      border: 2px solid transparent;
+      border-radius: 8px;
+      padding: 5px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+      width: 100px;
+    }
+    .pokemon-card.selected {
+      border-color: #4a90e2;
+      background: #e0f0ff;
+    }
+    .pokemon-card img {
+      max-width: 80px;
+      margin-bottom: 5px;
+    }
+    #selected-team {
+      margin-top: 10px;
+      font-weight: 500;
+    }
+    /* Styling for battle scene */
+    #battle-scene {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 20px;
+      background-size: cover;
+      background-position: center;
+      margin-bottom: 10px;
+    }
+    #battle-scene img {
+      width: 100px;
+    }
+    .pokemon-info {
+      text-align: center;
+      /* Pokemon names in black */
+      color: black;
+    }
+    .pokemon-info h4 {
+      margin: 5px 0;
+    }
+    .health-bar-container {
+      width: 100px;
+      background: gray;
+      border: 1px solid #000;
+      height: 10px;
+      margin: 5px auto;
+    }
+    .health-bar {
+      background: green;
+      height: 100%;
+    }
+    /* Container for battle chat log with fixed height */
+    #chat-container {
+      height: 150px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      margin: 10px 0;
+      padding: 5px;
+      background: #f9f9f9;
+    }
+    /* Display for team alive counts */
+    #team-counts {
+      text-align: center;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    /* Styles for search input and toggle button */
+    #team-search {
+      margin-bottom: 10px;
+      padding: 5px;
+      width: 200px;
+    }
+    #toggle-collection {
+      margin-left: 10px;
+      padding: 5px 10px;
+    }
+    /* Styles for move selection panel */
+    #move-selection {
+      margin-top: 10px;
+    }
+    #move-selection button {
+      margin: 5px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    /* Styles for swap options panel */
+    #swap-options {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+    }
+    #swap-options button {
+      margin: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Pokemon Game</h1>
+  </header>
+  
+  <!-- Audio elements for lootbox unboxing and duplicate sale sound effects -->
+  
+  <main>
+    <!-- Dashboard -->
+    <div id="dashboard-container" class="section">
+  
+  <main>
+    <!-- Dashboard -->
+    <div id="dashboard-container" class="section">
+      <h2>Dashboard</h2>
+      <p><strong>User:</strong> <span id="username">Player</span></p>
+      <p><strong>Balance:</strong> $<span id="balance">100</span></p>
+    </div>
+
+    <!-- Lootboxes -->
+    <div class="section">
+      <h3>Available Lootboxes</h3>
+      <div id="lootboxes"></div>
+      <div id="purchase-result" class="result-message" style="display: none;"></div>
+    </div>
+
+    <!-- Pokemon Collection -->
+    <div class="section">
+      <h3>Your Pokemon Collection
+        <button id="toggle-collection">Minimize</button>
+      </h3>
+      <button id="load-pokemon">Refresh Collection</button>
+      <ul id="collection"></ul>
+    </div>
+
+    <!-- Team Selection -->
+    <div class="section">
+      <h3>Team Selection (Up to 6 Pokemon)</h3>
+      <input type="text" id="team-search" placeholder="Search Pokemon in team..." />
+      <div id="pokemon-selection"></div>
+      <div id="selected-team"></div>
+    </div>
+
+    <!-- Battle Simulation -->
+    <div class="section">
+      <h3>Battle Simulation</h3>
+      <button id="battle-btn">Fight Battle</button>
+      <div id="battle-result" class="result-message" style="display: none;">
+        <!-- Battle scene, team counts, chat container, and move selection panel will be rendered here -->
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Simulated user data and lootboxes 
+    const currentUser = { id: 1, username: "Player", balance: 100 };
+    const availableLootboxes = [
+      { id: 1, price: 10 },
+      { id: 2, price: 50 },
+      { id: 3, price: 100 },
+      { id: 4, price: 500 },
+      { id: 5, price: 1000 }
+    ];
+
+    // Sample fallback Pokemon list
+    const samplePokemonList = [
+      { name: "Pikachu", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/pikachu.gif" },
+      { name: "Bulbasaur", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/bulbasaur.gif" },
+      { name: "Charmander", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/charmander.gif" },
+      { name: "Squirtle", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/squirtle.gif" },
+      { name: "Eevee", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/eevee.gif" }
+    ];
+
+    // Full Gen 1 Pokemon (151 Pokemon)
+    const fullGen1Pokemon = [
+      { name: "Bulbasaur", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/bulbasaur.gif" },
+      { name: "Ivysaur", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/ivysaur.gif" },
+      { name: "Venusaur", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/venusaur.gif" },
+      { name: "Charmander", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/charmander.gif" },
+      { name: "Charmeleon", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/charmeleon.gif" },
+      { name: "Charizard", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/charizard.gif" },
+      { name: "Squirtle", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/squirtle.gif" },
+      { name: "Wartortle", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/wartortle.gif" },
+      { name: "Blastoise", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/blastoise.gif" },
+      { name: "Caterpie", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/caterpie.gif" },
+      { name: "Metapod", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/metapod.gif" },
+      { name: "Butterfree", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/butterfree.gif" },
+      { name: "Weedle", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/weedle.gif" },
+      { name: "Kakuna", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/kakuna.gif" },
+      { name: "Beedrill", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/beedrill.gif" },
+      { name: "Pidgey", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/pidgey.gif" },
+      { name: "Pidgeotto", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/pidgeotto.gif" },
+      { name: "Pidgeot", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/pidgeot.gif" },
+      { name: "Rattata", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/rattata.gif" },
+      { name: "Raticate", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/raticate.gif" },
+      { name: "Spearow", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/spearow.gif" },
+      { name: "Fearow", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/fearow.gif" },
+      { name: "Ekans", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/ekans.gif" },
+      { name: "Arbok", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/arbok.gif" },
+      { name: "Pikachu", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/pikachu.gif" },
+      { name: "Raichu", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/raichu.gif" },
+      { name: "Sandshrew", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/sandshrew.gif" },
+      { name: "Sandslash", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/sandslash.gif" },
+      { name: "Nidoran♀", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/nidoranf.gif" },
+      { name: "Nidorina", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/nidorina.gif" },
+      { name: "Nidoqueen", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/nidoqueen.gif" },
+      { name: "Nidoran♂", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/nidoranm.gif" },
+      { name: "Nidorino", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/nidorino.gif" },
+      { name: "Nidoking", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/nidoking.gif" },
+      { name: "Clefairy", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/clefairy.gif" },
+      { name: "Clefable", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/clefable.gif" },
+      { name: "Vulpix", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/vulpix.gif" },
+      { name: "Ninetales", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/ninetales.gif" },
+      { name: "Jigglypuff", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/jigglypuff.gif" },
+      { name: "Wigglytuff", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/wigglytuff.gif" },
+      { name: "Zubat", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/zubat.gif" },
+      { name: "Golbat", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/golbat.gif" },
+      { name: "Oddish", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/oddish.gif" },
+      { name: "Gloom", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/gloom.gif" },
+      { name: "Vileplume", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/vileplume.gif" },
+      { name: "Paras", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/paras.gif" },
+      { name: "Parasect", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/parasect.gif" },
+      { name: "Venonat", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/venonat.gif" },
+      { name: "Venomoth", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/venomoth.gif" },
+      { name: "Diglett", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/diglett.gif" },
+      { name: "Dugtrio", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/dugtrio.gif" },
+      { name: "Meowth", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/meowth.gif" },
+      { name: "Persian", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/persian.gif" },
+      { name: "Psyduck", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/psyduck.gif" },
+      { name: "Golduck", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/golduck.gif" },
+      { name: "Mankey", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/mankey.gif" },
+      { name: "Primeape", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/primeape.gif" },
+      { name: "Growlithe", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/growlithe.gif" },
+      { name: "Arcanine", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/arcanine.gif" },
+      { name: "Poliwag", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/poliwag.gif" },
+      { name: "Poliwhirl", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/poliwhirl.gif" },
+      { name: "Poliwrath", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/poliwrath.gif" },
+      { name: "Abra", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/abra.gif" },
+      { name: "Kadabra", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/kadabra.gif" },
+      { name: "Alakazam", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/alakazam.gif" },
+      { name: "Machop", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/machop.gif" },
+      { name: "Machoke", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/machoke.gif" },
+      { name: "Machamp", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/machamp.gif" },
+      { name: "Bellsprout", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/bellsprout.gif" },
+      { name: "Weepinbell", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/weepinbell.gif" },
+      { name: "Victreebel", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/victreebel.gif" },
+      { name: "Tentacool", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/tentacool.gif" },
+      { name: "Tentacruel", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/tentacruel.gif" },
+      { name: "Geodude", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/geodude.gif" },
+      { name: "Graveler", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/graveler.gif" },
+      { name: "Golem", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/golem.gif" },
+      { name: "Ponyta", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/ponyta.gif" },
+      { name: "Rapidash", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/rapidash.gif" },
+      { name: "Slowpoke", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/slowpoke.gif" },
+      { name: "Slowbro", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/slowbro.gif" },
+      { name: "Magnemite", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/magnemite.gif" },
+      { name: "Magneton", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/magneton.gif" },
+      { name: "Farfetch'd", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/farfetchd.gif" },
+      { name: "Doduo", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/doduo.gif" },
+      { name: "Dodrio", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/dodrio.gif" },
+      { name: "Seel", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/seel.gif" },
+      { name: "Dewgong", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/dewgong.gif" },
+      { name: "Grimer", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/grimer.gif" },
+      { name: "Muk", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/muk.gif" },
+      { name: "Shellder", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/shellder.gif" },
+      { name: "Cloyster", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/cloyster.gif" },
+      { name: "Gastly", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/gastly.gif" },
+      { name: "Haunter", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/haunter.gif" },
+      { name: "Gengar", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/gengar.gif" },
+      { name: "Onix", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/onix.gif" },
+      { name: "Drowzee", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/drowzee.gif" },
+      { name: "Hypno", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/hypno.gif" },
+      { name: "Krabby", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/krabby.gif" },
+      { name: "Kingler", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/kingler.gif" },
+      { name: "Voltorb", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/voltorb.gif" },
+      { name: "Electrode", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/electrode.gif" },
+      { name: "Exeggcute", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/exeggcute.gif" },
+      { name: "Exeggutor", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/exeggutor.gif" },
+      { name: "Cubone", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/cubone.gif" },
+      { name: "Marowak", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/marowak.gif" },
+      { name: "Hitmonlee", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/hitmonlee.gif" },
+      { name: "Hitmonchan", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/hitmonchan.gif" },
+      { name: "Lickitung", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/lickitung.gif" },
+      { name: "Koffing", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/koffing.gif" },
+      { name: "Weezing", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/weezing.gif" },
+      { name: "Rhyhorn", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/rhyhorn.gif" },
+      { name: "Rhydon", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/rhydon.gif" },
+      { name: "Chansey", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/chansey.gif" },
+      { name: "Tangela", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/tangela.gif" },
+      { name: "Kangaskhan", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/kangaskhan.gif" },
+      { name: "Horsea", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/horsea.gif" },
+      { name: "Seadra", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/seadra.gif" },
+      { name: "Goldeen", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/goldeen.gif" },
+      { name: "Seaking", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/seaking.gif" },
+      { name: "Staryu", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/staryu.gif" },
+      { name: "Starmie", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/starmie.gif" },
+      { name: "Mr. Mime", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/mrmime.gif" },
+      { name: "Scyther", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/scyther.gif" },
+      { name: "Jynx", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/jynx.gif" },
+      { name: "Electabuzz", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/electabuzz.gif" },
+      { name: "Magmar", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/magmar.gif" },
+      { name: "Pinsir", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/pinsir.gif" },
+      { name: "Tauros", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/tauros.gif" },
+      { name: "Magikarp", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/magikarp.gif" },
+      { name: "Gyarados", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/gyarados.gif" },
+      { name: "Lapras", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/lapras.gif" },
+      { name: "Ditto", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/ditto.gif" },
+      { name: "Eevee", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/eevee.gif" },
+      { name: "Vaporeon", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/vaporeon.gif" },
+      { name: "Jolteon", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/jolteon.gif" },
+      { name: "Flareon", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/flareon.gif" },
+      { name: "Porygon", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/porygon.gif" },
+      { name: "Omanyte", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/omanyte.gif" },
+      { name: "Omastar", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/omastar.gif" },
+      { name: "Kabuto", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/kabuto.gif" },
+      { name: "Kabutops", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/kabutops.gif" },
+      { name: "Aerodactyl", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/aerodactyl.gif" },
+      { name: "Snorlax", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/snorlax.gif" },
+      { name: "Articuno", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/articuno.gif" },
+      { name: "Zapdos", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/zapdos.gif" },
+      { name: "Moltres", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/moltres.gif" },
+      { name: "Dratini", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/dratini.gif" },
+      { name: "Dragonair", generation: 1, rarity: "Common", image_url: "https://play.pokemonshowdown.com/sprites/ani/dragonair.gif" },
+      { name: "Dragonite", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/dragonite.gif" },
+      { name: "Mewtwo", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/mewtwo.gif" },
+      { name: "Mew", generation: 1, rarity: "Rare", image_url: "https://play.pokemonshowdown.com/sprites/ani/mew.gif" }
+    ];
+
+    const allGenPokemon = [ ...fullGen1Pokemon /* Additional generations omitted */ ];
+
+    // User collection and team (by name)
+    let userCollection = [];
+    let userTeam = [];
+    
+    // Battle simulation variables
+    let currentPlayerPokemon = null;
+    let currentAIPokemon = null;
+    let playerHP = 100;
+    let aiHP = 100;
+    let enemyTeam = [];  // Enemy team of up to 6 Pokemon
+
+    // Battle backgrounds
+    const battleBackgrounds = [
+      "images/showdown_bg1.jpg",
+      "images/showdown_bg2.jpg",
+      "images/showdown_bg3.jpg"
+    ];
+    
+    // Comprehensive individual movesets for every Gen1 Pokemon.
+    // Each key has an array of five moves.
+    const pokemonMoveSets = {
+      "Bulbasaur": ["Tackle", "Vine Whip", "Razor Leaf", "Seed Bomb", "Solar Beam"],
+      "Ivysaur": ["Tackle", "Vine Whip", "Razor Leaf", "Take Down", "Solar Beam"],
+      "Venusaur": ["Tackle", "Vine Whip", "Growth", "Petal Blizzard", "Solar Beam"],
+      "Charmander": ["Ember", "Scratch", "Flamethrower", "Dragon Breath", "Fire Fang"],
+      "Charmeleon": ["Scratch", "Ember", "Flame Burst", "Slash", "Dragon Rage"],
+      "Charizard": ["Flamethrower", "Fly", "Fire Spin", "Dragon Claw", "Heat Wave"],
+      "Squirtle": ["Tackle", "Water Gun", "Bite", "Rapid Spin", "Hydro Pump"],
+      "Wartortle": ["Water Gun", "Bite", "Aqua Tail", "Skull Bash", "Hydro Pump"],
+      "Blastoise": ["Water Gun", "Bite", "Shell Smash", "Ice Beam", "Hydro Pump"],
+      "Caterpie": ["Tackle", "String Shot", "Bug Bite", "Supersonic", "Poison Powder"],
+      "Metapod": ["Harden", "Tackle", "Protect", "Rest", "Harden"],
+      "Butterfree": ["Tackle", "Gust", "Psybeam", "Bug Buzz", "Quiver Dance"],
+      "Weedle": ["Tackle", "String Shot", "Poison Sting", "Bug Bite", "Leer"],
+      "Kakuna": ["Harden", "Tackle", "String Shot", "Harden", "Rest"],
+      "Beedrill": ["Pin Missile", "Twineedle", "Fury Attack", "Agility", "X-Scissor"],
+      "Pidgey": ["Gust", "Tackle", "Quick Attack", "Sand Attack", "Wing Attack"],
+      "Pidgeotto": ["Gust", "Quick Attack", "Feather Dance", "Wing Attack", "Air Cutter"],
+      "Pidgeot": ["Air Slash", "Hurricane", "Gust", "Quick Attack", "Heat Wave"],
+      "Rattata": ["Tackle", "Quick Attack", "Bite", "Double Kick", "Hyper Fang"],
+      "Raticate": ["Tackle", "Quick Attack", "Bite", "Dig", "Hyper Fang"],
+      "Spearow": ["Peck", "Growl", "Quick Attack", "Agility", "Drill Peck"],
+      "Fearow": ["Drill Peck", "Quick Attack", "Agility", "Wing Attack", "Mirror Move"],
+      "Ekans": ["Wrap", "Bite", "Poison Sting", "Glare", "Acid"],
+      "Arbok": ["Wrap", "Bite", "Acid", "Glare", "Poison Fang"],
+      "Pikachu": ["Thunder Shock", "Quick Attack", "Double Team", "Thunderbolt", "Iron Tail"],
+      "Raichu": ["Thunder Punch", "Quick Attack", "Thunderbolt", "Double Kick", "Electro Ball"],
+      "Sandshrew": ["Scratch", "Sand Attack", "Defence Curl", "Slash", "Sand Tomb"],
+      "Sandslash": ["Scratch", "Sand Attack", "Slash", "Dig", "Sandstorm"],
+      "Nidoran♀": ["Scratch", "Double Kick", "Poison Sting", "Tail Whip", "Bite"],
+      "Nidorina": ["Scratch", "Double Kick", "Poison Sting", "Take Down", "Bite"],
+      "Nidoqueen": ["Scratch", "Double Kick", "Poison Sting", "Body Slam", "Earthquake"],
+      "Nidoran♂": ["Tackle", "Double Kick", "Poison Sting", "Focus Energy", "Bite"],
+      "Nidorino": ["Tackle", "Double Kick", "Poison Sting", "Take Down", "Bite"],
+      "Nidoking": ["Tackle", "Double Kick", "Poison Jab", "Megahorn", "Earthquake"],
+      "Clefairy": ["Sing", "Pound", "Double Slap", "Minimize", "Body Slam"],
+      "Clefable": ["Sing", "Pound", "Double Slap", "Metronome", "Moonblast"],
+      "Vulpix": ["Ember", "Quick Attack", "Roar", "Will-O-Wisp", "Heat Wave"],
+      "Ninetales": ["Ember", "Roar", "Confuse Ray", "Flamethrower", "Fire Spin"],
+      "Jigglypuff": ["Sing", "Pound", "Double Slap", "Rest", "Body Slam"],
+      "Wigglytuff": ["Sing", "Pound", "Double Slap", "Hyper Voice", "Rest"],
+      "Zubat": ["Leech Life", "Tackle", "Supersonic", "Wing Attack", "Poison Fang"],
+      "Golbat": ["Leech Life", "Tackle", "Air Cutter", "Wing Attack", "False Swipe"],
+      "Oddish": ["Absorb", "Acid", "Growth", "Stun Spore", "Solar Beam"],
+      "Gloom": ["Absorb", "Acid", "Growth", "Poison Powder", "Solar Beam"],
+      "Vileplume": ["Absorb", "Acid", "Petal Dance", "Poison Powder", "Solar Beam"],
+      "Paras": ["Scratch", "String Shot", "Spore", "Leech Life", "Fury Cutter"],
+      "Parasect": ["Scratch", "String Shot", "Spore", "Leech Life", "Giga Drain"],
+      "Venonat": ["Tackle", "Supersonic", "Poison Powder", "Confusion", "Bite"],
+      "Venomoth": ["Tackle", "Supersonic", "Poison Powder", "Confuse Ray", "Air Slash"],
+      "Diglett": ["Scratch", "Dig", "Sand Attack", "Mud Sport", "Fury Swipes"],
+      "Dugtrio": ["Scratch", "Dig", "Sand Attack", "Mud Sport", "Earthquake"],
+      "Meowth": ["Scratch", "Growl", "Bite", "Pay Day", "Fury Swipes"],
+      "Persian": ["Scratch", "Bite", "Fury Swipes", "Fake Out", "Thunder Fang"],
+      "Psyduck": ["Water Gun", "Scratch", "Confusion", "Disable", "Headbutt"],
+      "Golduck": ["Water Gun", "Confusion", "Disable", "Ice Beam", "Hydro Pump"],
+      "Mankey": ["Scratch", "Low Kick", "Karate Chop", "Seismic Toss", "Cross Chop"],
+      "Primeape": ["Scratch", "Low Kick", "Karate Chop", "Cross Chop", "Thrash"],
+      "Growlithe": ["Bite", "Roar", "Ember", "Take Down", "Flame Wheel"],
+      "Arcanine": ["Bite", "Roar", "Flamethrower", "Extreme Speed", "Fire Blast"],
+      "Poliwag": ["Water Gun", "Splash", "Bubble", "Hypnosis", "Body Slam"],
+      "Poliwhirl": ["Water Gun", "Bubble", "Hypnosis", "Body Slam", "Double-Edge"],
+      "Poliwrath": ["Water Gun", "Bubble", "Hypnosis", "Body Slam", "Submission"],
+      "Abra": ["Telekenesis", "Confusion", "Psycho Cut", "Recover", "Future Sight"],
+      "Kadabra": ["Confusion", "Psycho Cut", "Recover", "Psychic", "Mirror Coat"],
+      "Alakazam": ["Confusion", "Psychic", "Psyshock", "Recover", "Focus Blast"],
+      "Machop": ["Low Kick", "Karate Chop", "Focus Energy", "Seismic Toss", "Cross Chop"],
+      "Machoke": ["Low Kick", "Karate Chop", "Seismic Toss", "Bulk Up", "Cross Chop"],
+      "Machamp": ["Low Kick", "Karate Chop", "Seismic Toss", "Cross Chop", "Dynamic Punch"],
+      "Bellsprout": ["Vine Whip", "Razor Leaf", "Growth", "Acid", "Double-Edge"],
+      "Weepinbell": ["Vine Whip", "Razor Leaf", "Acid", "Sleep Powder", "Solar Beam"],
+      "Victreebel": ["Vine Whip", "Razor Leaf", "Acid", "Sleep Powder", "Solar Beam"],
+      "Tentacool": ["Water Gun", "Bubble", "Wrap", "Acid", "Rapid Spin"],
+      "Tentacruel": ["Water Gun", "Bubble", "Wrap", "Acid", "Hydro Pump"],
+      "Geodude": ["Tackle", "Rock Throw", "Defense Curl", "Mud Sport", "Earthquake"],
+      "Graveler": ["Tackle", "Rock Throw", "Defense Curl", "Mud Sport", "Earthquake"],
+      "Golem": ["Tackle", "Rock Throw", "Defense Curl", "Earthquake", "Explosion"],
+      "Ponyta": ["Ember", "Tackle", "Agility", "Flame Wheel", "Quick Attack"],
+      "Rapidash": ["Ember", "Flame Wheel", "Agility", "Megakick", "Fire Blast"],
+      "Slowpoke": ["Water Gun", "Yawn", "Confusion", "Headbutt", "Rest"],
+      "Slowbro": ["Water Gun", "Confusion", "Headbutt", "Slack Off", "Hydro Pump"],
+      "Magnemite": ["Thunder Shock", "Tackle", "Sonic Boom", "Supersonic", "Discharge"],
+      "Magneton": ["Thunder Shock", "Sonic Boom", "Discharge", "Swift", "Thunder"],
+      "Farfetch'd": ["Peck", "Fury Cutter", "Sand Attack", "Slash", "Quick Attack"],
+      "Doduo": ["Peck", "Quick Attack", "Fury Attack", "Agility", "Growl"],
+      "Dodrio": ["Peck", "Quick Attack", "Fury Attack", "Agility", "Drill Peck"],
+      "Seel": ["Headbutt", "Tackle", "Water Gun", "Rest", "Ice Beam"],
+      "Dewgong": ["Headbutt", "Water Gun", "Ice Beam", "Rest", "Body Slam"],
+      "Grimer": ["Pound", "Poison Gas", "Sludge", "Acid Armor", "Explosion"],
+      "Muk": ["Pound", "Poison Gas", "Sludge", "Acid Armor", "Explosion"],
+      "Shellder": ["Clamp", "Tackle", "Water Gun", "Supersonic", "Ice Beam"],
+      "Cloyster": ["Clamp", "Tackle", "Aurora Beam", "Shell Smash", "Ice Beam"],
+      "Gastly": ["Lick", "Confuse Ray", "Night Shade", "Dream Eater", "Dark Pulse"],
+      "Haunter": ["Lick", "Confuse Ray", "Night Shade", "Dream Eater", "Spite"],
+      "Gengar": ["Shadow Ball", "Mean Look", "Dream Eater", "Dark Pulse", "Sludge Bomb"],
+      "Onix": ["Tackle", "Rock Throw", "Sand Attack", "Bind", "Rock Slide"],
+      "Drowzee": ["Pound", "Hypnosis", "Confusion", "Headbutt", "Rest"],
+      "Hypno": ["Pound", "Hypnosis", "Confusion", "Psychic", "Rest"],
+      "Krabby": ["Bubble", "Vice Grip", "Knock Off", "Stomp", "Crabhammer"],
+      "Kingler": ["Bubble", "Vice Grip", "Stomp", "Crabhammer", "Guillotine"],
+      "Voltorb": ["Tackle", "Charge", "Sonic Boom", "Electro Ball", "Self-Destruct"],
+      "Electrode": ["Tackle", "Charge", "Sonic Boom", "Electro Ball", "Self-Destruct"],
+      "Exeggcute": ["Absorb", "Acid", "Barrage", "Growth", "Reflect"],
+      "Exeggutor": ["Absorb", "Psychic", "Solar Beam", "Stomp", "Egg Bomb"],
+      "Cubone": ["Tackle", "Bone Club", "Headbutt", "Bone Rush", "Earthquake"],
+      "Marowak": ["Tackle", "Bone Club", "Headbutt", "Bonemerang", "Earthquake"],
+      "Hitmonlee": ["Low Kick", "Jump Kick", "High Jump Kick", "Mega Kick", "Rapid Kick"],
+      "Hitmonchan": ["Fire Punch", "Ice Punch", "Thunder Punch", "Mega Punch", "Double Slap"],
+      "Lickitung": ["Lick", "Wrap", "Supersonic", "Stomp", "Slam"],
+      "Koffing": ["Tackle", "Smog", "Self-Destruct", "Sludge", "Toxic"],
+      "Weezing": ["Tackle", "Smog", "Self-Destruct", "Sludge", "Toxic"],
+      "Rhyhorn": ["Tackle", "Horn Attack", "Rock Throw", "Leer", "Stomp"],
+      "Rhydon": ["Tackle", "Horn Attack", "Rock Throw", "Earthquake", "Stomp"],
+      "Chansey": ["Pound", "Sing", "Soft-Boiled", "Double-Edge", "Seismic Toss"],
+      "Tangela": ["Vine Whip", "Absorb", "Growth", "Sleep Powder", "Solar Beam"],
+      "Kangaskhan": ["Tackle", "Bite", "Mega Punch", "Body Slam", "Earthquake"],
+      "Horsea": ["Water Gun", "Bubble", "Smokescreen", "Drink Up", "Water Pulse"],
+      "Seadra": ["Water Gun", "Bubble", "Smokescreen", "Water Pulse", "Hydro Pump"],
+      "Goldeen": ["Peck", "Water Gun", "Supersonic", "Horn Attack", "Agility"],
+      "Seaking": ["Peck", "Water Gun", "Supersonic", "Horn Attack", "Agility"],
+      "Staryu": ["Tackle", "Water Gun", "Recover", "Rapid Spin", "Swift"],
+      "Starmie": ["Tackle", "Water Gun", "Psychic", "Rapid Spin", "Recover"],
+      "Mr. Mime": ["Confusion", "Barrier", "Pound", "Mimic", "Psychic"],
+      "Scyther": ["Quick Attack", "Fury Cutter", "Wing Attack", "Agility", "Slash"],
+      "Jynx": ["Powder Snow", "Lovely Kiss", "Pound", "Ice Beam", "Psychic"],
+      "Electabuzz": ["Thunder Shock", "Quick Attack", "Thunderbolt", "Light Screen", "Screech"],
+      "Magmar": ["Ember", "Scratch", "Flamethrower", "Smokescreen", "Fire Blast"],
+      "Pinsir": ["Vice Grip", "Submit", "Guillotine", "Harden", "Quick Attack"],
+      "Tauros": ["Tackle", "Horn Attack", "Pound", "Stomp", "Take Down"],
+      "Magikarp": ["Splash", "Tackle", "Flail", "Splash", "Splash"],
+      "Gyarados": ["Bite", "Dragon Rage", "Hydro Pump", "Hyper Beam", "Crunch"],
+      "Lapras": ["Ice Beam", "Body Slam", "Water Gun", "Sing", "Hydro Pump"],
+      "Ditto": ["Transform", "Tackle", "Body Slam", "Double-Edge", "Quick Attack"],
+      "Eevee": ["Tackle", "Quick Attack", "Bite", "Sand Attack", "Tail Whip"],
+      "Vaporeon": ["Water Gun", "Tackle", "Acid Armor", "Aqua Ring", "Hydro Pump"],
+      "Jolteon": ["Thunder Shock", "Quick Attack", "Double Kick", "Thunderbolt", "Pin Missile"],
+      "Flareon": ["Ember", "Quick Attack", "Bite", "Fire Fang", "Flamethrower"],
+      "Porygon": ["Tackle", "Quick Attack", "Conversion", "Agility", "Tri Attack"],
+      "Omanyte": ["Tackle", "Water Gun", "Bind", "Rock Throw", "Ancient Power"],
+      "Omastar": ["Tackle", "Water Gun", "Bind", "Rock Throw", "Ancient Power"],
+      "Kabuto": ["Scratch", "Absorb", "Mud Sport", "Sand Attack", "Slash"],
+      "Kabutops": ["Scratch", "Slash", "Fury Cutter", "Swords Dance", "Slash"],
+      "Aerodactyl": ["Bite", "Wing Attack", "Agility", "Rock Slide", "Crunch"],
+      "Snorlax": ["Headbutt", "Body Slam", "Rest", "Hyper Beam", "Crunch"],
+      "Articuno": ["Ice Beam", "Blizzard", "Sky Attack", "Roost", "Reflect"],
+      "Zapdos": ["Thunder Shock", "Drill Peck", "Thunderbolt", "Agility", "Discharge"],
+      "Moltres": ["Fire Spin", "Air Slash", "Flamethrower", "Roost", "Heat Wave"],
+      "Dratini": ["Tackle", "Wrap", "Agility", "Dragon Rage", "Dragon Claw"],
+      "Dragonair": ["Wrap", "Agility", "Dragon Rage", "Dragon Pulse", "Dragon Claw"],
+      "Dragonite": ["Dragon Claw", "Wing Attack", "Outrage", "Fire Punch", "Thunder Punch"],
+      "Mewtwo": ["Psychic", "Confusion", "Aura Sphere", "Shadow Ball", "Recover"],
+      "Mew": ["Psychic", "Mega Kick", "Barrier", "Double-Edge", "Agility"]
+    };
+    const defaultMoves = ["Tackle", "Quick Attack", "Growl", "Splash", "Rest"];
+    function getMoveSet(pokemon) {
+      return pokemonMoveSets[pokemon.name] || defaultMoves;
+    }
+    
+    // Save progress to localStorage
+    function saveProgress() {
+      const progress = {
+        userCollection,
+        userTeam,
+        balance: currentUser.balance,
+      };
+      console.log('Saving progress:', progress); // Debugging log
+      localStorage.setItem('pokemonGameProgress', JSON.stringify(progress));
+    }
+
+    // Load progress from localStorage
+    function loadProgress() {
+      const savedProgress = localStorage.getItem('pokemonGameProgress');
+      console.log('Loading progress from localStorage:', savedProgress); // Debugging log
+      if (savedProgress) {
+        const progress = JSON.parse(savedProgress);
+        userCollection = progress.userCollection || [];
+        userTeam = progress.userTeam || [];
+        currentUser.balance = progress.balance || 100;
+
+        // Update the UI with the loaded progress
+        updateBalance(currentUser.balance);
+        loadCollection();
+        populateTeamSelection();
+        console.log('Progress loaded:', progress); // Debugging log
+      } else {
+        console.log('No saved progress found.');
+      }
+    }
+
+    // Update balance and save progress
+    function updateBalance(newBalance) {
+      currentUser.balance = newBalance;
+      document.getElementById('balance').textContent = newBalance;
+      saveProgress(); // Save progress after updating balance
+    }
+    
+    // Load lootboxes
+    function loadLootboxes() {
+      const container = document.getElementById('lootboxes');
+      container.innerHTML = '';
+      availableLootboxes.forEach(lb => {
+        const btn = document.createElement('button');
+        btn.textContent = `Lootbox ${lb.id} - $${lb.price}`;
+        btn.addEventListener('click', () => purchaseLootbox(lb.id));
+        container.appendChild(btn);
+      });
+    }
+    
+    // Determine Pokemon count from lootbox price
+    function getPokemonCount(price) {
+      if (price === 10) return 5;
+      if (price === 50) return 7;
+      if (price === 100) return 9;
+      if (price === 500) return 12;
+      if (price === 1000) return 15;
+      return 5;
+    }
+    
+    // Remove the playUnboxingSound function
+    function playUnboxingSound(price) {
+      // Function removed since audio is not needed
+    }
+    
+    // Generate a random Gen 1 Pokemon
+    function generateRandomPokemon() {
+      return fullGen1Pokemon[Math.floor(Math.random() * fullGen1Pokemon.length)];
+    }
+    
+    // Simulate lootbox purchase
+    function purchaseLootbox(lootboxId) {
+      const lootbox = availableLootboxes.find(lb => lb.id === lootboxId);
+      const resultDiv = document.getElementById('purchase-result');
+      resultDiv.style.display = "none";
+      resultDiv.textContent = "";
+      if (!lootbox) {
+        resultDiv.textContent = "Invalid lootbox selection.";
+        resultDiv.style.display = "block";
+        return;
+      }
+      if (currentUser.balance < lootbox.price) {
+        resultDiv.textContent = "Insufficient funds.";
+        resultDiv.style.display = "block";
+        return;
+      }
+      currentUser.balance -= lootbox.price;
+      const count = getPokemonCount(lootbox.price);
+      let obtained = [];
+      let messages = [];
+      for (let i = 0; i < count; i++) {
+        const newPokemon = generateRandomPokemon();
+        const duplicate = userCollection.find(p => p.name === newPokemon.name);
+        if (duplicate) {
+          // Reduced duplicate sale value: Rare gives $10, Common gives $2.
+          let sellValue = newPokemon.rarity === "Rare" ? 10 : 2;
+          currentUser.balance += sellValue;
+          messages.push(`Duplicate ${newPokemon.name} sold for $${sellValue}`);
+          // Remove the audio playback
+          // document.getElementById("duplicate-audio").play();
+        } else {
+          userCollection.push(newPokemon);
+          obtained.push(newPokemon);
+          saveProgress(); // Save progress after adding Pokémon
+        }
+      }
+      updateBalance(currentUser.balance);
+      resultDiv.textContent = `Lootbox processed. ${obtained.length} new Pokemon obtained. ${messages.join(' | ')}`;
+      resultDiv.style.display = "block";
+      loadCollection();
+      populateTeamSelection();
+    }
+    
+    // Load Pokemon collection to list
+    function loadCollection() {
+      const list = document.getElementById('collection');
+      list.innerHTML = '';
+      if (userCollection.length === 0) {
+        list.innerHTML = '<li>No Pokemon in your collection.</li>';
+      } else {
+        userCollection.forEach(p => {
+          const li = document.createElement('li');
+          li.innerHTML = `<img src="${p.image_url}" alt="${p.name}" style="width:50px; vertical-align:middle; margin-right:8px;"> ${p.name} (Gen: ${p.generation}, Rarity: ${p.rarity})`;
+          list.appendChild(li);
+        });
+      }
+    }
+    
+    // Populate team selection grid
+    function populateTeamSelection() {
+      const container = document.getElementById('pokemon-selection');
+      container.innerHTML = '';
+      if (userCollection.length === 0) {
+        container.innerHTML = '<p>No Pokemon from lootboxes available for team selection.</p>';
+        updateSelectedTeamDisplay();
+        return;
+      }
+      const filter = document.getElementById('team-search').value.toLowerCase();
+      userCollection.forEach(pokemon => {
+        if (pokemon.name.toLowerCase().indexOf(filter) === -1) return;
+        const card = document.createElement('div');
+        card.classList.add("pokemon-card");
+        if (userTeam.includes(pokemon.name)) card.classList.add('selected');
+        card.innerHTML = `<img src="${pokemon.image_url}" alt="${pokemon.name}">
+                          <p>${pokemon.name}</p>`;
+        card.addEventListener('click', () => {
+          if (card.classList.contains('selected')) {
+            card.classList.remove('selected');
+            userTeam = userTeam.filter(name => name !== pokemon.name);
+          } else {
+            if (userTeam.length >= 6) {
+              alert('You can only select up to 6 Pokémon for your team.');
+              return;
+            }
+            card.classList.add('selected');
+            userTeam.push(pokemon.name);
+          }
+          updateSelectedTeamDisplay();
+          saveProgress(); // Save progress after updating the team
+        });
+        container.appendChild(card);
+      });
+      updateSelectedTeamDisplay();
+    }
+    
+    // Update selected team display
+    function updateSelectedTeamDisplay() {
+      const display = document.getElementById('selected-team');
+      display.textContent = "Selected Team: " + (userTeam.length ? userTeam.join(', ') : "None");
+    }
+    
+    // Toggle collection visibility
+    function toggleCollectionVisibility() {
+      const collElem = document.getElementById('collection');
+      const toggleBtn = document.getElementById('toggle-collection');
+      if (collElem.style.display === "none") {
+        collElem.style.display = "block";
+        toggleBtn.textContent = "Minimize";
+      } else {
+        collElem.style.display = "none";
+        toggleBtn.textContent = "Expand";
+      }
+    }
+    
+    // ---------------------------
+    // New Interactive Battle Code
+    // ---------------------------
+    
+    // Set random background for battle scene
+    function setBattleBackground(sceneElem) {
+      const rand = Math.floor(Math.random() * battleBackgrounds.length);
+      sceneElem.style.backgroundImage = `url('${battleBackgrounds[rand]}')`;
+    }
+    
+    // Update team counts (alive counts) in battle scene
+    function updateTeamCounts() {
+      const countsDiv = document.getElementById('team-counts');
+      countsDiv.innerHTML = `Your Pokemon Alive: ${userTeam.length} | Enemy Pokemon Alive: ${enemyTeam.length}`;
+    }
+    
+    // Initiate battle simulation
+    function battle() {
+      if (userTeam.length === 0) {
+        const resultDiv = document.getElementById('battle-result');
+        resultDiv.textContent = "Please set your team first.";
+        resultDiv.style.display = "block";
+        return;
+      }
+      // Reset HP
+      playerHP = 100;
+      aiHP = 100;
+      // Set active player Pokemon as first in userTeam using userCollection
+      const playerName = userTeam[0];
+      currentPlayerPokemon = userCollection.find(p => p.name.toLowerCase() === playerName.toLowerCase()) || samplePokemonList[0];
+      // Generate enemy team (6 Pokemon)
+      enemyTeam = [];
+      for (let i = 0; i < 6; i++) {
+        enemyTeam.push(generateRandomPokemon());
+      }
+      currentAIPokemon = enemyTeam[0];
+      
+      // Build battle UI
+      const battleDiv = document.getElementById('battle-result');
+      battleDiv.style.display = "block";
+      battleDiv.innerHTML = "";
+      
+      // Create battle scene container with random background
+      const sceneDiv = document.createElement('div');
+      sceneDiv.id = "battle-scene";
+      setBattleBackground(sceneDiv);
+      let playerImage = currentPlayerPokemon.image_url.replace('/ani/', '/ani-back/');
+      sceneDiv.innerHTML = `<div class="pokemon-info">
+                              <h4>${currentPlayerPokemon.name}</h4>
+                              <div class="health-bar-container">
+                                <div class="health-bar" id="player-health" style="width: 100%;"></div>
+                              </div>
+                              <img src="${playerImage}" alt="${currentPlayerPokemon.name}">
+                            </div>
+                            <div class="pokemon-info">
+                              <h4>${currentAIPokemon.name}</h4>
+                              <div class="health-bar-container">
+                                <div class="health-bar" id="ai-health" style="width: 100%;"></div>
+                              </div>
+                              <img src="${currentAIPokemon.image_url}" alt="${currentAIPokemon.name}">
+                            </div>`;
+      battleDiv.appendChild(sceneDiv);
+      
+      // Create team counts display
+      const countsDiv = document.createElement('div');
+      countsDiv.id = "team-counts";
+      countsDiv.style.marginBottom = "10px";
+      countsDiv.style.textAlign = "center";
+      countsDiv.style.fontWeight = "bold";
+      battleDiv.appendChild(countsDiv);
+      updateTeamCounts();
+      
+      // Create separate chat container (fixed height) for battle log
+      const chatContainer = document.createElement('div');
+      chatContainer.id = "chat-container";
+      const logDiv = document.createElement('div');
+      logDiv.id = "move-log";
+      chatContainer.appendChild(logDiv);
+      battleDiv.appendChild(chatContainer);
+      
+      // Create interactive move selection panel using the active player's move set
+      const movePanel = document.createElement('div');
+      movePanel.id = "move-selection";
+      const moveSet = getMoveSet(currentPlayerPokemon);
+      moveSet.forEach(move => {
+        const btn = document.createElement('button');
+        btn.textContent = move;
+        btn.addEventListener('click', () => choosePlayerMove(move));
+        movePanel.appendChild(btn);
+      });
+      // Add swap button for initiating swap
+      const swapBtn = document.createElement('button');
+      swapBtn.textContent = "Swap Pokemon";
+      swapBtn.addEventListener('click', showSwapOptions);
+      movePanel.appendChild(swapBtn);
+      battleDiv.appendChild(movePanel);
+      
+      // Hide Fight Battle button during battle
+      document.getElementById('battle-btn').style.display = "none";
+    }
+    
+    // Update health bar width
+    function updateHealthBar(elementId, hp) {
+      document.getElementById(elementId).style.width = hp + "%";
+    }
+    
+    // Handle player's move; logs move and deals damage
+    function choosePlayerMove(moveName) {
+      const logDiv = document.getElementById('move-log');
+      logDiv.innerHTML += `<p>You used ${moveName} with ${currentPlayerPokemon.name}!</p>`;
+      // Deal damage: subtract 20 HP from enemy Pokemon
+      aiHP = Math.max(aiHP - 20, 0);
+      updateHealthBar("ai-health", aiHP);
+      if (aiHP === 0) {
+        // Enemy Pokemon faints; remove from enemy team
+        enemyTeam.shift();
+        if (enemyTeam.length === 0) {
+          finishBattle(true);
+          return;
+        } else {
+          logDiv.innerHTML += `<p>${currentAIPokemon.name} fainted! Switching to next enemy Pokemon.</p>`;
+          currentAIPokemon = enemyTeam[0];
+          aiHP = 100;
+          updateHealthBar("ai-health", aiHP);
+          // Update enemy info in battle scene
+          const sceneDiv = document.getElementById('battle-scene');
+          let enemyImg = currentAIPokemon.image_url;
+          sceneDiv.querySelectorAll('.pokemon-info')[1].innerHTML = `<h4>${currentAIPokemon.name}</h4>
+                              <div class="health-bar-container">
+                                <div class="health-bar" id="ai-health" style="width: 100%;"></div>
+                              </div>
+                              <img src="${enemyImg}" alt="${currentAIPokemon.name}">`;
+          updateTeamCounts();
+        }
+      }
+      // After player's move, let AI take its turn
+      setTimeout(aiTurn, 1000);
+    }
+    
+    // Simulate AI's turn using its move set
+    function aiTurn() {
+      const logDiv = document.getElementById('move-log');
+      const enemyMoveSet = getMoveSet(currentAIPokemon);
+      const randIndex = Math.floor(Math.random() * enemyMoveSet.length);
+      const chosenMove = enemyMoveSet[randIndex];
+      logDiv.innerHTML += `<p>${currentAIPokemon.name} used ${chosenMove}!</p>`;
+      // Deal damage: subtract 15 HP from player's Pokemon
+      playerHP = Math.max(playerHP - 15, 0);
+      updateHealthBar("player-health", playerHP);
+      if (playerHP === 0) {
+        // If player's active Pokemon faints, remove it from userTeam
+        userTeam.shift();
+        if (userTeam.length === 0) {
+          finishBattle(false);
+          return;
+        } else {
+          logDiv.innerHTML += `<p>${currentPlayerPokemon.name} fainted! Auto-swapping to next available Pokemon.</p>`;
+          const newName = userTeam[0];
+          currentPlayerPokemon = userCollection.find(p => p.name.toLowerCase() === newName.toLowerCase());
+          playerHP = 100;
+          updateHealthBar("player-health", playerHP);
+          const sceneDiv = document.getElementById('battle-scene');
+          let playerImg = currentPlayerPokemon.image_url.replace('/ani/', '/ani-back/');
+          sceneDiv.querySelectorAll('.pokemon-info')[0].innerHTML = `<h4>${currentPlayerPokemon.name}</h4>
+                              <div class="health-bar-container">
+                                <div class="health-bar" id="player-health" style="width: 100%;"></div>
+                              </div>
+                              <img src="${playerImg}" alt="${currentPlayerPokemon.name}">`;
+          updateTeamCounts();
+        }
+      }
+    }
+    
+    // End battle and award reward
+    function finishBattle(winOutcome) {
+      const reward = winOutcome ? 50 : 10;
+      currentUser.balance += reward;
+      updateBalance(currentUser.balance);
+      const logDiv = document.getElementById('move-log');
+      const outcomeMsg = winOutcome ? "You won the battle!" : "You lost the battle!";
+      logDiv.innerHTML += `<p><strong>${outcomeMsg}</strong> Reward: $${reward}</p>`;
+      document.getElementById('move-selection').remove();
+      document.getElementById('battle-btn').style.display = "inline-block";
+    }
+    
+    // Show swap options as clickable buttons for available user Pokemon (excluding current)
+    function showSwapOptions() {
+      let existingSwap = document.getElementById('swap-options');
+      if (existingSwap) existingSwap.remove();
+      if (userTeam.length <= 1) {
+        alert("No other Pokemon available to swap!");
+        return;
+      }
+      const swapDiv = document.createElement('div');
+      swapDiv.id = "swap-options";
+      swapDiv.innerHTML = "<p>Select a Pokemon to swap in:</p>";
+      const availableOptions = userTeam.filter(name => name !== currentPlayerPokemon.name);
+      availableOptions.forEach(name => {
+        const btn = document.createElement('button');
+        btn.textContent = name;
+        btn.addEventListener('click', () => {
+          currentPlayerPokemon = userCollection.find(p => p.name.toLowerCase() === name.toLowerCase());
+          playerHP = 100;
+          updateHealthBar("player-health", playerHP);
+          const sceneDiv = document.getElementById('battle-scene');
+          let playerImg = currentPlayerPokemon.image_url.replace('/ani/', '/ani-back/');
+          sceneDiv.querySelectorAll('.pokemon-info')[0].innerHTML = `<h4>${currentPlayerPokemon.name}</h4>
+                              <div class="health-bar-container">
+                                <div class="health-bar" id="player-health" style="width: 100%;"></div>
+                              </div>
+                              <img src="${playerImg}" alt="${currentPlayerPokemon.name}">`;
+          swapDiv.remove();
+          const logDiv = document.getElementById('move-log');
+          logDiv.innerHTML += `<p>You swapped to ${currentPlayerPokemon.name}!</p>`;
+          // Refresh move buttons to reflect the current Pokemon's move set
+          const movePanel = document.getElementById('move-selection');
+          movePanel.innerHTML = "";
+          const newMoveSet = getMoveSet(currentPlayerPokemon);
+          newMoveSet.forEach(move => {
+            const btn = document.createElement('button');
+            btn.textContent = move;
+            btn.addEventListener('click', () => choosePlayerMove(move));
+            movePanel.appendChild(btn);
+          });
+          // Re-add swap button
+          const swapBtn = document.createElement('button');
+          swapBtn.textContent = "Swap Pokemon";
+          swapBtn.addEventListener('click', showSwapOptions);
+          movePanel.appendChild(swapBtn);
+        });
+        swapDiv.appendChild(btn);
+      });
+      document.getElementById('battle-result').appendChild(swapDiv);
+    }
+    
+    // ---------------------------
+    // End Interactive Battle Code
+    // ---------------------------
+    
+    // Initial setup
+    document.getElementById('username').textContent = currentUser.username;
+    updateBalance(currentUser.balance);
+    loadLootboxes();
+    loadCollection();
+    populateTeamSelection();
+    
+    // Event Listeners
+    document.getElementById('load-pokemon').addEventListener('click', () => {
+      loadCollection();
+      populateTeamSelection();
+    });
+    document.getElementById('toggle-collection').addEventListener('click', toggleCollectionVisibility);
+    document.getElementById('team-search').addEventListener('input', populateTeamSelection);
+    document.getElementById('battle-btn').addEventListener('click', battle);
+    
+    // Load progress on page load
+    window.onload = function () {
+      console.log('Page loaded. Loading progress...');
+      loadProgress(); // Load progress from localStorage
+      loadCollection();
+      populateTeamSelection();
+    };
+  </script>
+</body>
+</html>
